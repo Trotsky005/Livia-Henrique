@@ -76,17 +76,23 @@ function iguais(a, b) {
   for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return r === 0;
 }
-async function criarToken(env) {
-  const exp = String(Date.now() + TOKEN_HORAS * 3600 * 1000);
-  return exp + "." + (await hmac(env.SENHA + "|noivos", exp));
+// A senha pode vir do segredo SENHA (painel) ou do banco (coleção privada "segredo").
+async function senhaAtual(env, db) {
+  if (env.SENHA && String(env.SENHA).trim()) return String(env.SENHA).trim();
+  const s = await pegar(db, "segredo", "senha");
+  return s && s.senha ? String(s.senha).trim() : "";
 }
-async function tokenValido(env, request) {
+async function criarToken(senha) {
+  const exp = String(Date.now() + TOKEN_HORAS * 3600 * 1000);
+  return exp + "." + (await hmac(senha + "|noivos", exp));
+}
+async function tokenValido(senha, request) {
   const h = request.headers.get("authorization") || "";
   const t = h.replace(/^Bearer\s+/i, "");
   const [exp, sig] = t.split(".");
-  if (!exp || !sig || !env.SENHA) return false;
+  if (!exp || !sig || !senha) return false;
   if (Number(exp) < Date.now()) return false;
-  return iguais(sig, await hmac(env.SENHA + "|noivos", exp));
+  return iguais(sig, await hmac(senha + "|noivos", exp));
 }
 
 // ---------- regras de presentes ----------
@@ -226,15 +232,26 @@ export async function onRequest(context) {
     // ===== noivos =====
     if (metodo === "POST" && partes[0] === "login") {
       const b = await lerCorpo(request);
-      if (!env.SENHA) return erro("Senha não configurada no painel da Cloudflare (SENHA).", 500);
-      await new Promise((r) => setTimeout(r, 400)); // freia tentativas em sequência
-      const ok = iguais(await hmac("cmp", String(b.senha || "").trim()), await hmac("cmp", String(env.SENHA).trim()));
+      const senha = await senhaAtual(env, db);
+      if (!senha) return erro("Senha ainda não cadastrada. Cadastre pelo Console do banco D1 (veja o README).", 500);
+      await new Promise((r) => setTimeout(r, 600)); // freia tentativas em sequência
+      const ok = iguais(await hmac("cmp", String(b.senha || "").trim()), await hmac("cmp", senha));
       if (!ok) return erro("Senha incorreta.", 401);
-      return json({ token: await criarToken(env) });
+      return json({ token: await criarToken(senha) });
     }
 
     if (partes[0] === "admin") {
-      if (!(await tokenValido(env, request))) return erro("Entre novamente na Área dos noivos.", 401);
+      const senhaVigente = await senhaAtual(env, db);
+      if (!(await tokenValido(senhaVigente, request))) return erro("Entre novamente na Área dos noivos.", 401);
+
+      if (metodo === "POST" && partes[1] === "senha") {
+        if (env.SENHA) return erro("A senha está definida no painel da Cloudflare (SENHA). Altere por lá.", 400);
+        const b = await lerCorpo(request);
+        const nova = String(b.nova || "").trim();
+        if (nova.length < 8) return erro("Use uma senha com pelo menos 8 caracteres.");
+        await gravar(db, "segredo", "senha", { senha: nova });
+        return json({ ok: true, token: await criarToken(nova) });
+      }
 
       if (metodo === "GET" && partes[1] === "tudo") {
         const [cfg, itens, gifts, convites, rsvp, historico, espera] = await Promise.all(

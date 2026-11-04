@@ -449,7 +449,7 @@ input[type=file]{max-width:100%}
           </div>
           <div class="row2">
             <div><label class="f" for="cPrazo">Confirmar presença até (depois a confirmação fecha)</label><input class="in" id="cPrazo" type="date"></div>
-            <div><label class="f">Senha da Área dos noivos</label><p class="note" style="margin:6px 0 0">A senha é definida no painel da Cloudflare (segredo SENHA).</p><input id="cSenha" type="hidden" value=""></div>
+            <div><label class="f" for="cSenha">Nova senha da Área dos noivos</label><input class="in" id="cSenha" type="password" autocomplete="new-password" placeholder="Deixe em branco para manter"></div>
           </div>
           <label class="f" for="cEntrega">Instruções para presente físico</label>
           <textarea class="in" id="cEntrega" placeholder="Ex.: Pode entregar no endereço Rua X, 123 — ou combine com a gente pelo WhatsApp (11) 9..."></textarea>
@@ -2213,8 +2213,8 @@ $("cfgForm").addEventListener("submit",function(e){
   c.eventos=JSON.parse(JSON.stringify(S.cfg.eventos||{}));
   document.querySelectorAll("#cfgChas [data-ev]").forEach(function(i){var ev=i.dataset.ev;c.eventos[ev]=c.eventos[ev]||{};c.eventos[ev][i.dataset.k]=i.value.trim()});
   var nova=$("cSenha").value;
-  if(nova&&nova.length<4)return toast("A senha precisa de pelo menos 4 caracteres");
-  (nova?hashSenha(nova):Promise.resolve(c.senhaHash)).then(function(h){c.senhaHash=h;return saveCfg(c)}).then(function(){toast(nova?"Configurações e senha salvas":"Configurações salvas");$("cSenha").value=""});
+  if(nova&&nova.trim().length<8)return toast("Use uma senha com pelo menos 8 caracteres");
+  (nova?api("POST","/api/admin/senha",{nova:nova}).then(function(r){TOKEN=r.token;try{sessionStorage.setItem("noivosToken",TOKEN)}catch(e){}}):Promise.resolve()).then(function(){return saveCfg(c)}).then(function(){toast(nova?"Configurações e senha salvas":"Configurações salvas");$("cSenha").value=""});
 });
 
 // ---------- áreas ----------

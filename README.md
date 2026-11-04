@@ -34,11 +34,16 @@ Roda de graça na **Cloudflare Pages** com banco **D1**.
    - Build output directory: **public**
 4. **Save and Deploy**.
 
-### 4. Ligar o banco e a senha
-No projeto criado → **Settings**:
-1. **Bindings → Add → D1 database**: Variable name **`DB`**, banco **casamento** → Save.
-2. **Variables and Secrets → Add**: Type **Secret**, nome **`SENHA`**, valor = a senha da Área dos noivos → Save.
-3. Vá em **Deployments** e clique em **Retry deployment** (ou faça um novo deploy) para valer as configurações.
+### 4. Senha da Área dos noivos
+No banco D1 **casamento → Console**, rode (trocando pela sua senha, com pelo menos 8 caracteres):
+
+```sql
+INSERT OR REPLACE INTO docs (col, id, data, atualizado)
+VALUES ('segredo', 'senha', '{"senha":"SUA_SENHA_AQUI"}', '2026-11-04');
+```
+
+Depois dá para trocar a senha pela própria Área dos noivos (Configurações → Nova senha).
+A senha fica só no banco, que é privado — nunca aparece no site nem no GitHub.
 
 ### 5. Testar
 - Abra o endereço `https://<nome-do-projeto>.pages.dev`.
