@@ -134,11 +134,30 @@ function base64ParaBytes(b64) {
   return out;
 }
 
+
+// ---------- preparo automático do banco ----------
+// Cria as tabelas se ainda não existirem e, se o banco estiver vazio, carrega os dados iniciais.
+const DADOS_INICIAIS = [["config", "site", {"casal": "Lívia e Henrique", "data": "2027-05-15", "hora": "17:30", "local": "Igreja Matriz de Sant'Ana", "endereco": "Praça 9 de Julho, 5, Areias - SP", "capacidade": 180, "acrescimo": 0, "chave": "", "nome": "", "cidade": "", "linkCartao": ""}], ["convites", "familia-fabao-nu9a", {"codigo": "h94k4wkxvz", "enviado": false, "enviadoEm": "", "nome": "Família Fabão", "pessoas": ["Fábio", "Karen", "Ana Clara", "Maria", "Beatriz", "Gustavo"], "telefone": "", "eventos": ["casamento"]}], ["convites", "familia-matheus-63bt", {"codigo": "UNAUM4fqVX", "enviado": false, "enviadoEm": "", "eventos": ["casamento"], "lado": "noivo", "nome": "Família Matheus", "pessoas": ["Matheus", "Juliana"], "telefone": ""}], ["convites", "familia-tia-lourdes-9kgm", {"codigo": "ftAKWEknFX", "enviado": false, "enviadoEm": "", "nome": "Família Tia Lourdes", "pessoas": ["Lourdes", "Soraya", "Frank"], "telefone": "", "eventos": ["casamento"]}], ["convites", "familia-vanda-jzs2", {"codigo": "vaGYxwRPkx", "enviado": false, "enviadoEm": "", "nome": "Família Vanda", "pessoas": ["Vanda", "Adriano"], "telefone": "", "eventos": ["casamento"]}], ["espera", "espera-xandinho-jk92", {"lado": "noivo", "nome": "Xandinho", "ordem": 1, "pessoas": ["Xandinho", "Esposa"], "telefone": ""}], ["espera", "espera-luiz-antonio-3i8s", {"lado": "", "nome": "Luiz Antônio", "ordem": 2, "pessoas": ["Luiz Antônio", "Elizabeth"], "telefone": ""}], ["itens", "geladeira", {"categoria": "Casa", "descricao": "Frost free, inox, 2 portas, ~450 L, 220V.", "emoji": "🧊", "fisico": false, "linkCartao": "", "nome": "Geladeira", "ordem": 0, "qtd": 1, "valor": 4200}], ["itens", "panela", {"categoria": "Casa", "descricao": "Para o Henrique aprender a cozinhar.", "emoji": "🍳", "linkCartao": "", "nome": "Jogo de panelas", "ordem": 1, "qtd": 1, "valor": 1}], ["itens", "airfryer", {"categoria": "Casa", "descricao": "A salvadora dos jantares de semana.", "emoji": "🍟", "fisico": true, "linkCartao": "", "nome": "Air fryer", "ordem": 2, "qtd": 1, "valor": 450}], ["itens", "jogocama", {"categoria": "Casa", "descricao": "Lençol que a gente não precisa brigar pra dividir.", "emoji": "🛏️", "linkCartao": "", "nome": "Jogo de cama", "ordem": 3, "qtd": 2, "valor": 220}], ["itens", "passagens", {"categoria": "Lua de mel", "descricao": "Cada cota nos leva um pouquinho mais longe.", "emoji": "✈️", "linkCartao": "", "nome": "Passagens da lua de mel", "ordem": 4, "qtd": 20, "valor": 250}], ["itens", "jantar", {"categoria": "Lua de mel", "descricao": "Com vista pro mar, de preferência.", "emoji": "🍷", "linkCartao": "", "nome": "Jantar romântico na lua de mel", "ordem": 5, "qtd": 3, "valor": 300}], ["itens", "pizza", {"categoria": "Divertidos", "descricao": "Tradição de domingo garantida.", "emoji": "🍕", "linkCartao": "", "nome": "Primeira pizza de casados", "ordem": 6, "qtd": 5, "valor": 90}], ["itens", "sogra", {"categoria": "Divertidos", "descricao": "Brincadeira! (Mas aceitamos.)", "emoji": "🛡️", "linkCartao": "", "nome": "Seguro contra visita surpresa da sogra", "ordem": 7, "qtd": 3, "valor": 150}], ["itens", "buffet", {"categoria": "Festa", "descricao": "Pra ninguém sair com fome da festa.", "emoji": "🎂", "linkCartao": "", "nome": "Ajuda no buffet", "ordem": 8, "qtd": 6, "valor": 500}], ["itens", "livre", {"categoria": "Lua de mel", "descricao": "Você escolhe quanto quer dar — tudo ajuda!", "emoji": "💝", "linkCartao": "", "livre": true, "nome": "Contribua com qualquer valor", "ordem": 9, "qtd": 1, "valor": 100}]];
+let bancoPronto = false;
+async function prepararBanco(db) {
+  if (bancoPronto) return;
+  await db.prepare("CREATE TABLE IF NOT EXISTS docs (col TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, atualizado TEXT NOT NULL, PRIMARY KEY (col, id))").run();
+  await db.prepare("CREATE TABLE IF NOT EXISTS fotos (id TEXT PRIMARY KEY, mime TEXT NOT NULL, data TEXT NOT NULL)").run();
+  const tem = await db.prepare("SELECT COUNT(*) AS n FROM docs WHERE col <> 'segredo'").first();
+  if (!tem || !tem.n) {
+    for (const [col, id, data] of DADOS_INICIAIS) {
+      await db.prepare("INSERT OR IGNORE INTO docs (col, id, data, atualizado) VALUES (?, ?, ?, ?)").bind(col, id, JSON.stringify(data), new Date().toISOString()).run();
+    }
+  }
+  bancoPronto = true;
+}
+
 // ---------- rotas ----------
 export async function onRequest(context) {
   const { request, env } = context;
   const db = env.DB;
   if (!db) return erro("Banco não configurado (ligação DB).", 500);
+  try { await prepararBanco(db); } catch (e) { return erro("Não consegui preparar o banco.", 500); }
   const url = new URL(request.url);
   const partes = url.pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
   const metodo = request.method;
