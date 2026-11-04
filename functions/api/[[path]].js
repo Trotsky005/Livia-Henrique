@@ -228,7 +228,7 @@ export async function onRequest(context) {
       const b = await lerCorpo(request);
       if (!env.SENHA) return erro("Senha não configurada no painel da Cloudflare (SENHA).", 500);
       await new Promise((r) => setTimeout(r, 400)); // freia tentativas em sequência
-      const ok = iguais(await hmac("cmp", String(b.senha || "")), await hmac("cmp", env.SENHA));
+      const ok = iguais(await hmac("cmp", String(b.senha || "").trim()), await hmac("cmp", String(env.SENHA).trim()));
       if (!ok) return erro("Senha incorreta.", 401);
       return json({ token: await criarToken(env) });
     }
