@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lívia e Henrique · 15.05.27</title>
 <meta name="robots" content="noindex">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Lívia e Henrique · 15.05.27">
+<meta property="og:description" content="Com a bênção de seus pais, Lívia e Henrique convidam para o seu casamento. Toque para abrir o seu convite.">
+<meta property="og:image" content="https://livia-henrique.eng-henrique-coutinho.workers.dev/convite.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="800">
+<meta property="og:image:height" content="1219">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Cormorant+SC:wght@500;600;700&family=Pinyon+Script&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -432,6 +439,11 @@ input[type=file]{max-width:100%}
           </div>
           <label class="f" for="cSite">Endereço do site (usado nos links dos convites)</label>
           <input class="in" id="cSite" placeholder="https://...">
+          <label class="f" for="cMsgWa">Mensagem do WhatsApp (convite)</label>
+          <textarea class="in" id="cMsgWa" style="min-height:190px"></textarea>
+          <p class="note" style="margin:4px 0 0">Palavras entre chaves que o site troca sozinho: <b>{nome}</b> (nome do convite), <b>{link}</b>, <b>{prazo}</b> (data limite de confirmação), <b>{data}</b>, <b>{hora}</b>, <b>{local}</b>, <b>{casal}</b>. Sem prazo definido, a linha do prazo some. A imagem do convite aparece sozinha na prévia do link.</p>
+          <div class="actions" style="margin-top:6px"><button type="button" class="btn small ghost" id="msgWaPadrao">Voltar ao texto padrão</button><button type="button" class="btn small ghost" id="msgWaPrev">Ver exemplo</button></div>
+          <div id="msgWaEx" class="box" hidden style="box-shadow:none;background:var(--bg);white-space:pre-wrap;font-size:13px;margin-top:8px"></div>
           <div hidden><label class="f" for="cMsg">Mensagem para os convidados</label>
           <textarea class="in" id="cMsg"></textarea></div>
           <div class="row3">
@@ -2111,8 +2123,14 @@ $("rsvpRows").addEventListener("click",function(e){var t=e.target.closest(".tip"
 $("rsvpRows").addEventListener("change",function(e){var i=e.target.closest("input[data-env]");if(!i)return;var c=S.convidados.find(function(x){return x.id===i.dataset.env});if(!c)return;
   var d=Object.assign({},c,{enviado:i.checked,enviadoEm:i.checked?new Date().toISOString():""});delete d.id;
   saveConvite(c.id,d).then(function(){toast(i.checked?"Marcado como enviado":"Desmarcado")})});
+var MSG_WA_PADRAO="Olá, {nome}! 💌\n\nCom muita alegria, convidamos vocês para o nosso casamento, no dia {data}, às {hora}, na {local}.\n\nAbra o seu convite pelo link abaixo — por ele vocês confirmam a presença e conhecem a nossa lista de presentes:\n{link}\n\nPedimos, por gentileza, que confirmem a presença até {prazo}.\n\nCom carinho,\n{casal}";
+function dataLonga(iso){return iso?new Date(iso+"T12:00:00").toLocaleDateString("pt-BR",{day:"numeric",month:"long",year:"numeric"}):""}
+function montaMsgWa(c){var m=(S.cfg.msgWhats||"").trim()||MSG_WA_PADRAO;var prazo=S.cfg.rsvpPrazo?new Date(S.cfg.rsvpPrazo+"T12:00:00").toLocaleDateString("pt-BR",{day:"numeric",month:"long"}):"";
+  if(!prazo)m=m.split("\n").filter(function(l){return l.indexOf("{prazo}")<0}).join("\n");
+  var v={nome:c.nome,link:linkConvite(c),prazo:prazo,casal:S.cfg.casal||"",data:dataLonga(S.cfg.data),hora:(S.cfg.hora||"").replace(":","h"),local:S.cfg.local||""};
+  return m.replace(/\{(nome|link|prazo|casal|data|hora|local)\}/g,function(_,k){return v[k]||""}).replace(/\n{3,}/g,"\n\n")}
 function waLink(c){var tel=((S.convidados.find(function(x){return x.id===c.id})||c).telefone||"").replace(/\D/g,"");if(tel&&tel.length<=11)tel="55"+tel;
-  var txt="Olá, "+c.nome+"! 💌\n\nCom muita alegria, convidamos vocês para o nosso casamento.\nAbra o seu convite, confirme a presença e veja a lista de presentes:\n"+linkConvite(c)+"\n\nCom carinho,\n"+(S.cfg.casal||"");
+  var txt=montaMsgWa(c);
   return "https://wa.me/"+(tel||"")+"?text="+encodeURIComponent(txt)}
 function waLembrete(c){var tel=(c.telefone||"").replace(/\D/g,"");if(tel&&tel.length<=11)tel="55"+tel;
   var prazo=S.cfg.rsvpPrazo?" até "+new Date(S.cfg.rsvpPrazo+"T12:00:00").toLocaleDateString("pt-BR",{day:"numeric",month:"long"}):"";
@@ -2164,7 +2182,7 @@ function fillCfgForm(){
       '<div class="row3"><div><label class="f">Horário</label><input class="in" type="time" data-ev="'+ev+'" data-k="hora" value="'+esc(e.hora||"")+'"></div><div><label class="f">Local</label><input class="in" data-ev="'+ev+'" data-k="local" value="'+esc(e.local||"")+'" placeholder="Ex.: Casa da Lívia"></div><div><label class="f">Endereço</label><input class="in" data-ev="'+ev+'" data-k="endereco" value="'+esc(e.endereco||"")+'"></div></div>'+
       '<label class="f">Recado sobre o presente (aparece ao reservar)</label><input class="in" data-ev="'+ev+'" data-k="entrega" value="'+esc(e.entrega||"")+'" placeholder="Ex.: Leve o presente embrulhado no dia do chá 💛">'+
       '<p class="note">Link para enviar aos convidados: o endereço do site com <b>#'+n.hash+'</b> no final.</p></div>'}).join("");
-  var c=S.cfg;$("cCap").value=c.capacidade||180;$("cSite").value=c.site||"";$("cHora").value=c.hora||"";$("cLocal").value=c.local||"";$("cEnd").value=c.endereco||"";$("cCasal").value=c.casal||"";$("cData").value=c.data||"";$("cMsg").value=c.mensagem||"";$("cChave").value=c.chave||"";$("cNome").value=c.nome||"";$("cCidade").value=c.cidade||"";$("cAcres").value=c.acrescimo==null?"":c.acrescimo;$("cLink").value=c.linkCartao||"";$("cEntrega").value=c.entrega||"";$("cPrazo").value=c.rsvpPrazo||"";$("cSenha").value=""}
+  var c=S.cfg;$("cMsgWa").value=(c.msgWhats||"").trim()||MSG_WA_PADRAO;$("cCap").value=c.capacidade||180;$("cSite").value=c.site||"";$("cHora").value=c.hora||"";$("cLocal").value=c.local||"";$("cEnd").value=c.endereco||"";$("cCasal").value=c.casal||"";$("cData").value=c.data||"";$("cMsg").value=c.mensagem||"";$("cChave").value=c.chave||"";$("cNome").value=c.nome||"";$("cCidade").value=c.cidade||"";$("cAcres").value=c.acrescimo==null?"":c.acrescimo;$("cLink").value=c.linkCartao||"";$("cEntrega").value=c.entrega||"";$("cPrazo").value=c.rsvpPrazo||"";$("cSenha").value=""}
 var IMG="";
 function setPrev(){$("fPrev").innerHTML=IMG?'<img alt="" src="'+IMG+'">':"sem foto";$("fImgDel").hidden=!IMG}
 function resizeImage(file){return new Promise(function(res,rej){
@@ -2208,7 +2226,7 @@ $("giftRows").addEventListener("click",function(e){
 $("cfgForm").addEventListener("submit",function(e){
   e.preventDefault();
   var c={casal:$("cCasal").value.trim(),data:$("cData").value,mensagem:$("cMsg").value.trim(),chave:$("cChave").value.trim(),nome:$("cNome").value.trim(),cidade:$("cCidade").value.trim(),acrescimo:parseFloat($("cAcres").value)||0,linkCartao:$("cLink").value.trim(),entrega:$("cEntrega").value.trim()};
-  c.capacidade=parseInt($("cCap").value,10)||180;c.site=$("cSite").value.trim();c.hora=$("cHora").value;c.local=$("cLocal").value.trim();c.endereco=$("cEnd").value.trim();
+  c.msgWhats=$("cMsgWa").value.trim();if(c.msgWhats===MSG_WA_PADRAO)c.msgWhats="";c.capacidade=parseInt($("cCap").value,10)||180;c.site=$("cSite").value.trim();c.hora=$("cHora").value;c.local=$("cLocal").value.trim();c.endereco=$("cEnd").value.trim();
   c.rsvpPrazo=$("cPrazo").value;c.senhaHash=S.cfg.senhaHash||"";
   c.eventos=JSON.parse(JSON.stringify(S.cfg.eventos||{}));
   document.querySelectorAll("#cfgChas [data-ev]").forEach(function(i){var ev=i.dataset.ev;c.eventos[ev]=c.eventos[ev]||{};c.eventos[ev][i.dataset.k]=i.value.trim()});
@@ -2243,6 +2261,8 @@ $("subtabs").addEventListener("click",function(e){var b=e.target.closest("button
   $("novoCv").addEventListener("click",function(){resetCv();abrirPop("cv")});
   $("novoEs").addEventListener("click",function(){resetEs();abrirPop("es")});
 })();
+$("msgWaPadrao").addEventListener("click",function(){$("cMsgWa").value=MSG_WA_PADRAO});
+$("msgWaPrev").addEventListener("click",function(){var bak=S.cfg.msgWhats,bp=S.cfg.rsvpPrazo;S.cfg.msgWhats=$("cMsgWa").value;S.cfg.rsvpPrazo=$("cPrazo").value;var c=S.convidados[0]||{nome:"Família Exemplo",id:"exemplo",codigo:"exemplo"};$("msgWaEx").textContent=montaMsgWa(c);$("msgWaEx").hidden=false;S.cfg.msgWhats=bak;S.cfg.rsvpPrazo=bp});
 showSec(SEC);
 document.querySelectorAll("#evsel button").forEach(function(b){b.setAttribute("aria-pressed",b.dataset.ev===AEV)});
 setCvEvs([AEV]);setTimeout(updItemFormEv,0);
